@@ -17,13 +17,20 @@ import (
 	"net/http"
 	"net/url"
 	"os"
-	//"os/exec"
+	"sort"
+	"strings"
 )
 
 const videoPath string = "/home/kestein/Videos"
+const referer string = "Referer"
 
 func list(w http.ResponseWriter, req *http.Request) {
-	dir, err := os.Open(videoPath)
+	// ls the directory
+	endDir, err := url.QueryUnescape(req.URL.String())
+	if err != nil {
+		log.Fatal("Unable to parse video path %s", err)
+	}
+	dir, err := os.Open(fmt.Sprintf("%s/%s", videoPath, endDir))
 	if err != nil {
 		log.Fatal("Unable to open video path %s", err)
 	}
@@ -31,13 +38,27 @@ func list(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Fatal("Unable to read dir %s", err)
 	}
-	io.WriteString(w, "<html><body><ul>\n")
+	// Write the HTML. Sort out by directories and files
+	subDirs := make([]string, 1)
+	orphanFiles := make([]string, 1)
 	for i := 0; i < len(files); i++ {
-		vid := fmt.Sprintf("%s", files[i].Name())
-		url := fmt.Sprintf("<li><a href=/play/%s>%s</a></li>\n", url.QueryEscape(vid), vid)
-		io.WriteString(w, url)
+		// For printing
+		fileName := files[i].Name()
+		// For RESTing
+		vidURL := fmt.Sprintf("%s/%s", req.URL.String(), url.QueryEscape(fileName))
+		if files[i].IsDir() {
+			url := fmt.Sprintf("<li><a href=/list/%s>%s</a></li>\n", vidURL, fileName)
+			subDirs = append(subDirs, url)
+		} else {
+			url := fmt.Sprintf("<li><a href=/play/%s>%s</a></li>\n", vidURL, fileName)
+			orphanFiles = append(orphanFiles, url)
+		}
 	}
-	io.WriteString(w, "</ul></body></html>\n")
+	// Write HTML to the reponse
+	sort.Strings(subDirs)
+	sort.Strings(orphanFiles)
+	htmlBody := fmt.Sprintf("<html><body><ul>\n%s%s</ul></body></html>\n", strings.Join(subDirs, "\n"), strings.Join(orphanFiles, "\n"))
+	io.WriteString(w, htmlBody)
 }
 
 func play(w http.ResponseWriter, req *http.Request) {
@@ -61,6 +82,7 @@ func main() {
 	flag.Parse()
 
 	http.Handle("/", http.StripPrefix("/", http.HandlerFunc(list)))
+	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 	http.Handle("/list/", http.StripPrefix("/list/", http.HandlerFunc(list)))
 	http.Handle("/play/", http.StripPrefix("/play/", http.HandlerFunc(play)))
 
