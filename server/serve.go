@@ -24,9 +24,11 @@ import (
 const videoPath string = "/home/kestein/Videos"
 const referer string = "Referer"
 
+// TODO: Sanitize URLs so only subdirectories of videoPath can be queried
 func list(w http.ResponseWriter, req *http.Request) {
+	localURL := req.RequestURI[6:] // Take out the '/list'
 	// ls the directory
-	endDir, err := url.QueryUnescape(req.URL.String())
+	endDir, err := url.QueryUnescape(localURL)
 	if err != nil {
 		log.Fatal("Unable to parse video path %s", err)
 	}
@@ -39,13 +41,18 @@ func list(w http.ResponseWriter, req *http.Request) {
 		log.Fatal("Unable to read dir %s", err)
 	}
 	// Write the HTML. Sort out by directories and files
-	subDirs := make([]string, 1)
-	orphanFiles := make([]string, 1)
+	subDirs := []string{}
+	orphanFiles := []string{}
 	for i := 0; i < len(files); i++ {
 		// For printing
 		fileName := files[i].Name()
 		// For RESTing
-		vidURL := fmt.Sprintf("%s/%s", req.URL.String(), url.QueryEscape(fileName))
+		vidURL := ""
+		if len(req.URL.String()) > 0 {
+			vidURL = fmt.Sprintf("%s/%s", req.URL.String(), url.QueryEscape(fileName))
+		} else {
+			vidURL = fmt.Sprintf("%s", url.QueryEscape(fileName))
+		}
 		if files[i].IsDir() {
 			url := fmt.Sprintf("<li><a href=/list/%s>%s</a></li>\n", vidURL, fileName)
 			subDirs = append(subDirs, url)
@@ -56,7 +63,16 @@ func list(w http.ResponseWriter, req *http.Request) {
 	}
 	// Write HTML to the reponse
 	sort.Strings(subDirs)
+	// Make the '..' directory at the top
+	prev := strings.Split(req.URL.String(), "/")
+	back := ""
+	if len(prev) > 1 {
+		back = strings.Join(prev[:len(prev)-1], "/")
+	}
+	previousLink := []string{fmt.Sprintf("<li><a href=/list/%s>..</a></li>\n", back)}
+	subDirs = append(previousLink, subDirs...)
 	sort.Strings(orphanFiles)
+	// Write the HTML
 	htmlBody := fmt.Sprintf("<html><body><ul>\n%s%s</ul></body></html>\n", strings.Join(subDirs, "\n"), strings.Join(orphanFiles, "\n"))
 	io.WriteString(w, htmlBody)
 }
