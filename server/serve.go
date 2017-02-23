@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
+	vlc "github.com/jteeuwen/go-vlc"
 	"html/template"
 	"io"
 	"log"
@@ -35,6 +36,11 @@ const pageEnd string = `
 
 type videoLine struct {
 	Action, Url, Filename string
+}
+
+type cartoon struct {
+	inst   *vlc.Instance
+	player *vlc.Player
 }
 
 type videoLineList []videoLine
@@ -105,19 +111,43 @@ func list(w http.ResponseWriter, req *http.Request) {
 	io.WriteString(w, pageEnd)
 }
 
-func play(w http.ResponseWriter, req *http.Request) {
-	// Take everything after the '/' and play it in VLC
-	/*rawVideo := string(req.URL.Path[1:])
+func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
+	var media *vlc.Media
+	// var evt *vlc.EventManager
+	var err error
+
+	// Obtain the name of the video to view
+	rawVideo := string(req.URL.Path[0:])
 	video, err := url.QueryUnescape(rawVideo)
 	if err != nil {
 		fmt.Println("WRONG")
 	}
-	cartoon := exec.Command("vlc", "-f", fmt.Sprintf("%s/%s", videoPath, video))
-	err = cartoon.Start()
-	if err != nil {
-		log.Fatal("WRONG")
-	}*/
-	fmt.Println("asdf")
+	// Make VLC instance
+	if state.inst, err = vlc.New([]string{}); err != nil {
+		fmt.Println(err)
+	}
+	// Open the video file
+	if media, err = state.inst.OpenMediaFile(fmt.Sprintf("%s/%s", videoPath, video)); err != nil {
+		fmt.Println(err)
+	}
+	// Create the media player
+	if state.player, err = media.NewPlayer(); err != nil {
+		fmt.Println(err)
+	}
+	// Do not need media anymore since player now owns it
+	media.Release()
+	media = nil
+
+	// Make the page to control the video
+	// Websockets?
+	state.player.Play()
+}
+
+func closePlayer(state *cartoon) {
+	state.player.Release()
+	state.inst.Release()
+	state.player = nil
+	state.inst = nil
 }
 
 func main() {
@@ -125,11 +155,15 @@ func main() {
 	directory := flag.String("d", ".", "the directory of static file to host")
 	flag.Parse()
 
+	state := cartoon{inst: nil, player: nil}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "list", 301)
 	})
 	http.Handle("/list/", http.StripPrefix("/list/", http.HandlerFunc(list)))
-	http.Handle("/play/", http.StripPrefix("/play/", http.HandlerFunc(play)))
+	http.Handle("/play/", http.StripPrefix("/play/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			play(&state, w, req)
+		})))
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
