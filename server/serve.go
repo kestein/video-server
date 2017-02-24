@@ -33,14 +33,46 @@ const pageEnd string = `
 	</body>
 </html>
 `
+const playerPage string = `
+<html>
+	<script>
+		window.onload = function () {
+			var playback = document.getElementById("playback");
+			playback.addEventListener("click", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/playback/", true);
+				x.send();
+			});
+
+			var stop = document.getElementById("stop");
+			stop.addEventListener("click", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/stop/", true);
+				x.send();
+			});
+		};
+	</script>
+	<body>
+		<button id="playback">Pause</button>
+		<button id="stop">Stop</button>
+	</body>
+</html>
+`
 
 type videoLine struct {
 	Action, Url, Filename string
 }
 
 type cartoon struct {
-	inst   *vlc.Instance
-	player *vlc.Player
+	inst    *vlc.Instance
+	player  *vlc.Player
+	playing bool
 }
 
 type videoLineList []videoLine
@@ -139,10 +171,19 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	media = nil
 
 	// Make the page to control the video
-	// Websockets?
 	state.player.Play()
+	state.playing = true
+	io.WriteString(w, playerPage)
 }
 
+func stop(state *cartoon, w http.ResponseWriter, req *http.Request) {
+	if state.player == nil {
+		return
+	}
+	state.player.Stop()
+	state.playing = false
+	closePlayer(state)
+}
 func closePlayer(state *cartoon) {
 	state.player.Release()
 	state.inst.Release()
@@ -155,7 +196,11 @@ func main() {
 	directory := flag.String("d", ".", "the directory of static file to host")
 	flag.Parse()
 
-	state := cartoon{inst: nil, player: nil}
+	state := cartoon{
+		inst:    nil,
+		player:  nil,
+		playing: false,
+	}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "list", 301)
 	})
@@ -164,6 +209,19 @@ func main() {
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			play(&state, w, req)
 		})))
+	http.Handle("/playback/", http.StripPrefix("/playback/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			fmt.Println("pausing")
+			state.player.TogglePause(!state.playing)
+			state.playing = !state.playing
+		})))
+	http.Handle("/stop/", http.StripPrefix("/stop/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			stop(&state, w, req)
+		})))
+	http.HandleFunc("/info/", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Println(state.inst)
+	})
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
