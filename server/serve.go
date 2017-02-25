@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 )
@@ -81,7 +82,6 @@ func (a videoLineList) Len() int           { return len(a) }
 func (a videoLineList) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a videoLineList) Less(i, j int) bool { return a[i].Url < a[j].Url }
 
-// TODO: Sanitize URLs so only subdirectories of videoPath can be queried
 func list(w http.ResponseWriter, req *http.Request) {
 	localURL := req.RequestURI[6:] // Take out the '/list'
 	// ls the directory
@@ -89,7 +89,17 @@ func list(w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		log.Fatal("Unable to parse video path %s", err)
 	}
-	dir, err := os.Open(fmt.Sprintf("%s/%s", videoPath, endDir))
+	fullPath, err := filepath.Abs(fmt.Sprintf("%s/%s", videoPath, endDir))
+	if err != nil {
+		log.Fatal("%s not a good path", fullPath)
+	}
+	// Check the paths to ensure that only videos are considered
+	if len(fullPath) >= len(videoPath) {
+		if fullPath[0:len(videoPath)] != videoPath {
+			http.Error(w, "Not in the video path", http.StatusUnauthorized)
+		}
+	}
+	dir, err := os.Open(fullPath)
 	if err != nil {
 		log.Fatal("Unable to open video path %s", err)
 	}
@@ -184,6 +194,7 @@ func stop(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	state.playing = false
 	closePlayer(state)
 }
+
 func closePlayer(state *cartoon) {
 	state.player.Release()
 	state.inst.Release()
@@ -211,7 +222,6 @@ func main() {
 		})))
 	http.Handle("/playback/", http.StripPrefix("/playback/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			fmt.Println("pausing")
 			state.player.TogglePause(!state.playing)
 			state.playing = !state.playing
 		})))
