@@ -176,6 +176,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	if state.player, err = media.NewPlayer(); err != nil {
 		fmt.Println(err)
 	}
+	state.player.SetVolume(25)
 	// Do not need media anymore since player now owns it
 	media.Release()
 	media = nil
@@ -222,7 +223,8 @@ func main() {
 		})))
 	http.Handle("/playback/", http.StripPrefix("/playback/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			state.player.TogglePause(!state.playing)
+			fmt.Println("toggling pause")
+			state.player.TogglePause(state.playing)
 			state.playing = !state.playing
 		})))
 	http.Handle("/stop/", http.StripPrefix("/stop/",
