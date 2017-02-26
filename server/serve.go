@@ -17,6 +17,7 @@ import (
 
 const videoPath string = "/home/kestein/Videos"
 const referer string = "Referer"
+const secToMilli int64 = 1000
 const pageStart string = `
 <html>
 	<body>
@@ -42,7 +43,12 @@ const playerPage string = `
 			playback.addEventListener("click", function() {
 				var x = new XMLHttpRequest();
 				x.onreadystatechange = function() {
-
+					var buttonText = String(playback.innerHTML);
+					if (buttonText == "Pause") {
+						playback.innerHTML = "Play";
+					} else {
+						playback.innerHTML = "Pause";
+					}
 				};
 				x.open("GET", "/playback/", true);
 				x.send();
@@ -57,11 +63,22 @@ const playerPage string = `
 				x.open("GET", "/stop/", true);
 				x.send();
 			});
+
+			var rewind = document.getElementById("rewind");
+			rewind.addEventListener("click", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/rewind/", true);
+				x.send();
+			});
 		};
 	</script>
 	<body>
 		<button id="playback">Pause</button>
 		<button id="stop">Stop</button>
+		<button id="rewind">Back 10 seconds</button>
 	</body>
 </html>
 `
@@ -159,7 +176,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	var err error
 
 	// Obtain the name of the video to view
-	rawVideo := string(req.URL.Path[0:])
+	rawVideo := req.RequestURI[6:] // Take out the '/play'
 	video, err := url.QueryUnescape(rawVideo)
 	if err != nil {
 		fmt.Println("WRONG")
@@ -203,6 +220,25 @@ func closePlayer(state *cartoon) {
 	state.inst = nil
 }
 
+func pausePlay(state *cartoon) {
+	state.player.TogglePause(state.playing)
+	state.playing = !state.playing
+}
+
+func rewind(state *cartoon) {
+	var secsRewound int64 = 10
+	curTime, err := state.player.Time()
+	if err != nil {
+		panic(err)
+	}
+	rTime := curTime - (secsRewound * secToMilli)
+	if rTime < 0 {
+		state.player.SetTime(0)
+	} else {
+		state.player.SetTime(rTime)
+	}
+}
+
 func main() {
 	port := flag.String("p", "8100", "port to serve on")
 	directory := flag.String("d", ".", "the directory of static file to host")
@@ -223,17 +259,16 @@ func main() {
 		})))
 	http.Handle("/playback/", http.StripPrefix("/playback/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			fmt.Println("toggling pause")
-			state.player.TogglePause(state.playing)
-			state.playing = !state.playing
+			pausePlay(&state)
+		})))
+	http.Handle("/rewind/", http.StripPrefix("/rewind/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			rewind(&state)
 		})))
 	http.Handle("/stop/", http.StripPrefix("/stop/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			stop(&state, w, req)
 		})))
-	http.HandleFunc("/info/", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Println(state.inst)
-	})
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
