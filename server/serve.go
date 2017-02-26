@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 )
 
@@ -73,12 +74,23 @@ const playerPage string = `
 				x.open("GET", "/rewind/", true);
 				x.send();
 			});
+
+			var volume = document.getElementById("volume");
+			volume.addEventListener("mouseup", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/volume/" + volume.value, true);
+				x.send();
+			});
 		};
 	</script>
 	<body>
 		<button id="playback">Pause</button>
 		<button id="stop">Stop</button>
 		<button id="rewind">Back 10 seconds</button>
+		<input type="range" id="volume" min="0" max="100" step="1" value="25">
 	</body>
 </html>
 `
@@ -214,6 +226,9 @@ func stop(state *cartoon, w http.ResponseWriter, req *http.Request) {
 }
 
 func closePlayer(state *cartoon) {
+	if state.player == nil {
+		return
+	}
 	state.player.Release()
 	state.inst.Release()
 	state.player = nil
@@ -221,11 +236,17 @@ func closePlayer(state *cartoon) {
 }
 
 func pausePlay(state *cartoon) {
+	if state.player == nil {
+		return
+	}
 	state.player.TogglePause(state.playing)
 	state.playing = !state.playing
 }
 
 func rewind(state *cartoon) {
+	if state.player == nil {
+		return
+	}
 	var secsRewound int64 = 10
 	curTime, err := state.player.Time()
 	if err != nil {
@@ -237,6 +258,13 @@ func rewind(state *cartoon) {
 	} else {
 		state.player.SetTime(rTime)
 	}
+}
+
+func setVolume(state *cartoon, toVol int) {
+	if state.player == nil {
+		return
+	}
+	state.player.SetVolume(toVol)
 }
 
 func main() {
@@ -268,6 +296,15 @@ func main() {
 	http.Handle("/stop/", http.StripPrefix("/stop/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			stop(&state, w, req)
+		})))
+	http.Handle("/volume/", http.StripPrefix("/volume/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			toVol, err := strconv.ParseInt(req.URL.String(), 10, 64)
+			if err != nil {
+				fmt.Println("NaN")
+				return
+			}
+			setVolume(&state, int(toVol))
 		})))
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
