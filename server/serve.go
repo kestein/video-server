@@ -69,7 +69,7 @@ const playerPage string = `
 			rewind.addEventListener("click", function() {
 				var x = new XMLHttpRequest();
 				x.onreadystatechange = function() {
-
+					// Set the seek bar to the video time
 				};
 				x.open("GET", "/rewind/", true);
 				x.send();
@@ -84,13 +84,24 @@ const playerPage string = `
 				x.open("GET", "/volume/" + volume.value, true);
 				x.send();
 			});
+
+			var seek = document.getElementById("seek");
+			seek.addEventListener("mouseup", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/time/" + seek.value, true);
+				x.send();
+			});
 		};
 	</script>
 	<body>
 		<button id="playback">Pause</button>
 		<button id="stop">Stop</button>
 		<button id="rewind">Back 10 seconds</button>
-		<input type="range" id="volume" min="0" max="100" step="1" value="25">
+		<input type="range" id="volume" min="0" max="100" step="1" value="{{.vol}}">
+		<input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
 	</body>
 </html>
 `
@@ -192,28 +203,52 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	video, err := url.QueryUnescape(rawVideo)
 	if err != nil {
 		fmt.Println("WRONG")
+		return
 	}
 	// Make VLC instance
 	if state.inst, err = vlc.New([]string{}); err != nil {
 		fmt.Println(err)
+		return
 	}
 	// Open the video file
 	if media, err = state.inst.OpenMediaFile(fmt.Sprintf("%s/%s", videoPath, video)); err != nil {
 		fmt.Println(err)
+		return
 	}
 	// Create the media player
 	if state.player, err = media.NewPlayer(); err != nil {
 		fmt.Println(err)
+		return
 	}
+	// Initialize player state
 	state.player.SetVolume(25)
+	//state.player.SetFullscreen(true)
 	// Do not need media anymore since player now owns it
 	media.Release()
 	media = nil
 
 	// Make the page to control the video
 	state.player.Play()
+	// Wait for the player to start playing
+	for {
+		t, err := state.player.Length()
+		if err != nil {
+			panic(err)
+		}
+		if t > 0 {
+			break
+		}
+	}
+	vidLen, err := state.player.Length()
+	vidLen = vidLen / secToMilli
 	state.playing = true
-	io.WriteString(w, playerPage)
+	t := template.Must(template.New("player").Parse(playerPage))
+	vals := map[string]int64{
+		"vol":  25,
+		"secs": vidLen,
+	}
+	t.Execute(w, vals)
+	//io.WriteString(w, playerPage)
 }
 
 func stop(state *cartoon, w http.ResponseWriter, req *http.Request) {
@@ -267,6 +302,13 @@ func setVolume(state *cartoon, toVol int) {
 	state.player.SetVolume(toVol)
 }
 
+func setTime(state *cartoon, seek int64) {
+	if state.player == nil {
+		return
+	}
+	state.player.SetTime(seek * secToMilli)
+}
+
 func main() {
 	port := flag.String("p", "8100", "port to serve on")
 	directory := flag.String("d", ".", "the directory of static file to host")
@@ -296,6 +338,17 @@ func main() {
 	http.Handle("/stop/", http.StripPrefix("/stop/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			stop(&state, w, req)
+		})))
+	// If this API endpoint is called "seek" it breaks if you try to seek to 0.
+	// WTF
+	http.Handle("/time/", http.StripPrefix("/time/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			seekPos, err := strconv.ParseInt(req.URL.String(), 10, 64)
+			if err != nil {
+				fmt.Println("NaN")
+				return
+			}
+			setTime(&state, seekPos)
 		})))
 	http.Handle("/volume/", http.StripPrefix("/volume/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
