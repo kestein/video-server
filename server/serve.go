@@ -50,6 +50,7 @@ const playerPage string = `
 					} else {
 						playback.innerHTML = "Pause";
 					}
+					/* Eventually set the seek value to be what the player's second is */
 				};
 				x.open("GET", "/playback/", true);
 				x.send();
@@ -102,9 +103,28 @@ const playerPage string = `
 			}, 1000);
 
 			var timestamp = document.getElementById("timestamp");
+			var stamps = document.getElementById("timestamps");
 			timestamp.addEventListener("click", function() {
-				console.log(seek.value/60 + ":" + seek.value % 60);
+				stamp = document.createElement("div");
+				stamp.innerText = formatTime(seek.value);
+				stamps.appendChild(stamp);
 			});
+
+			function formatTime(n) {
+				var minutes = Math.floor(n/60);
+				var seconds = n%60;
+				if (seconds < 9) {
+					seconds = "0" + seconds;
+				}
+				// hours formatting untested so far
+				if (minutes >= 60) {
+					var hours = Math.floor(minutes/60);
+					minutes = minutes%60;
+					return hours + ":" + minutes + ":" + seconds;
+				} else {
+					return minutes + ":" + seconds;
+				}
+			}
 		};
 	</script>
 	<body>
@@ -114,6 +134,7 @@ const playerPage string = `
 		<input type="range" id="volume" min="0" max="100" step="1" value="{{.vol}}">
 		<input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
 		<button id="timestamp">Timestamp</button>
+		<div id="timestamps"></div>
 	</body>
 </html>
 `
