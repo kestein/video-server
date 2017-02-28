@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	vlc "github.com/jteeuwen/go-vlc"
+	vlc "github.com/kestein/go-vlc"
 	"html/template"
 	"io"
 	"log"
@@ -63,6 +63,7 @@ const playerPage string = `
 				};
 				x.open("GET", "/stop/", true);
 				x.send();
+				playback.innerHTML = "Play";
 			});
 
 			var rewind = document.getElementById("rewind");
@@ -94,6 +95,16 @@ const playerPage string = `
 				x.open("GET", "/time/" + seek.value, true);
 				x.send();
 			});
+			setInterval(function() {
+				if (String(playback.innerHTML) === "Pause")  {
+					seek.stepUp(1);
+				}
+			}, 1000);
+
+			var timestamp = document.getElementById("timestamp");
+			timestamp.addEventListener("click", function() {
+				console.log(seek.value/60 + ":" + seek.value % 60);
+			});
 		};
 	</script>
 	<body>
@@ -102,6 +113,7 @@ const playerPage string = `
 		<button id="rewind">Back 10 seconds</button>
 		<input type="range" id="volume" min="0" max="100" step="1" value="{{.vol}}">
 		<input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
+		<button id="timestamp">Timestamp</button>
 	</body>
 </html>
 `
