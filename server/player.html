@@ -1,5 +1,13 @@
 <html>
 	<script>
+        function stopVideo(isAsync) {
+            var x = new XMLHttpRequest();
+            x.onreadystatechange = function() {
+
+            };
+            x.open("GET", "/stop/", isAsync);
+            x.send();
+        }
 		window.onload = function () {
 			var playback = document.getElementById("playback");
 			playback.addEventListener("click", function() {
@@ -18,15 +26,10 @@
 			});
 
 			var stop = document.getElementById("stop");
-			stop.addEventListener("click", function() {
-				var x = new XMLHttpRequest();
-				x.onreadystatechange = function() {
-
-				};
-				x.open("GET", "/stop/", true);
-				x.send();
-				playback.innerHTML = "Play";
-			});
+            stop.addEventListener("click", function() {
+                stopVideo(true);
+                playback.innerHTML = "Play";
+            });
 
 			var rewind = document.getElementById("rewind");
 			rewind.addEventListener("click", function() {
@@ -81,6 +84,9 @@
 				if (minutes >= 60) {
 					var hours = Math.floor(minutes/60);
 					minutes = minutes%60;
+                    if minutes < 9 {
+                        minutes = "0" + minutes;
+                    }
 					return hours + ":" + minutes + ":" + seconds;
 				} else {
 					return minutes + ":" + seconds;
@@ -97,6 +103,10 @@
 				x.send();
 			});
 		};
+        window.onbeforeunload = function() {
+            stopVideo(false);
+            return null;
+        };
 	</script>
 	<body>
 		<button id="playback">Pause</button>
