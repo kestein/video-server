@@ -37,119 +37,6 @@ const pageEnd string = `
 	</body>
 </html>
 `
-const playerPage string = `
-<html>
-	<script>
-		window.onload = function () {
-			var playback = document.getElementById("playback");
-			playback.addEventListener("click", function() {
-				var x = new XMLHttpRequest();
-				x.onreadystatechange = function() {
-					var buttonText = String(playback.innerHTML);
-					if (buttonText == "Pause") {
-						playback.innerHTML = "Play";
-					} else {
-						playback.innerHTML = "Pause";
-					}
-					/* Eventually set the seek value to be what the player's second is */
-				};
-				x.open("GET", "/playback/", true);
-				x.send();
-			});
-
-			var stop = document.getElementById("stop");
-			stop.addEventListener("click", function() {
-				var x = new XMLHttpRequest();
-				x.onreadystatechange = function() {
-
-				};
-				x.open("GET", "/stop/", true);
-				x.send();
-				playback.innerHTML = "Play";
-			});
-
-			var rewind = document.getElementById("rewind");
-			rewind.addEventListener("click", function() {
-				var x = new XMLHttpRequest();
-				x.onreadystatechange = function() {
-					// Set the seek bar to the video time
-				};
-				x.open("GET", "/rewind/", true);
-				x.send();
-			});
-
-			var volume = document.getElementById("volume");
-			volume.addEventListener("mouseup", function() {
-				var x = new XMLHttpRequest();
-				x.onreadystatechange = function() {
-
-				};
-				x.open("GET", "/volume/" + volume.value, true);
-				x.send();
-			});
-
-			var seek = document.getElementById("seek");
-			seek.addEventListener("mouseup", function() {
-				var x = new XMLHttpRequest();
-				x.onreadystatechange = function() {
-
-				};
-				x.open("GET", "/time/" + seek.value, true);
-				x.send();
-			});
-			setInterval(function() {
-				if (String(playback.innerHTML) === "Pause")  {
-					seek.stepUp(1);
-				}
-			}, 1000);
-
-			var timestamp = document.getElementById("timestamp");
-			var stamps = document.getElementById("timestamps");
-			timestamp.addEventListener("click", function() {
-				stamp = document.createElement("div");
-				stamp.innerText = formatTime(seek.value);
-				stamps.appendChild(stamp);
-			});
-
-			function formatTime(n) {
-				var minutes = Math.floor(n/60);
-				var seconds = n%60;
-				if (seconds < 9) {
-					seconds = "0" + seconds;
-				}
-				// hours formatting untested so far
-				if (minutes >= 60) {
-					var hours = Math.floor(minutes/60);
-					minutes = minutes%60;
-					return hours + ":" + minutes + ":" + seconds;
-				} else {
-					return minutes + ":" + seconds;
-				}
-			}
-
-			var screenshot = document.getElementById("screenshot");
-			screenshot.addEventListener("click", function() {
-				var x = new XMLHttpRequest();
-				x.onreadystatechange = function() {
-
-				};
-				x.open("GET", "/screenshot/", true);
-				x.send();
-			});
-		};
-	</script>
-	<body>
-		<button id="playback">Pause</button>
-		<button id="stop">Stop</button>
-		<button id="rewind">Back 10 seconds</button>
-		<input type="range" id="volume" min="0" max="100" step="1" value="{{.vol}}">
-		<input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
-		<button id="timestamp">Timestamp</button>
-		<button id="screenshot">Screenshot</button>
-		<div id="timestamps"></div>
-	</body>
-</html>
-`
 
 type videoLine struct {
 	Action, Url, Filename string
@@ -287,7 +174,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	vidLen, err := state.player.Length()
 	vidLen = vidLen / secToMilli
 	state.playing = true
-	t := template.Must(template.New("player").Parse(playerPage))
+	t := template.Must(template.New("player.html").ParseFiles("./player.html"))
 	vals := map[string]int64{
 		"vol":  25,
 		"secs": vidLen,
