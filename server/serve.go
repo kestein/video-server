@@ -17,6 +17,7 @@ import (
 )
 
 const videoPath string = "/home/kestein/Videos"
+const screenshotPath = "/home/kestein/Pictures/screenshots"
 const referer string = "Referer"
 const secToMilli int64 = 1000
 const pageStart string = `
@@ -125,6 +126,16 @@ const playerPage string = `
 					return minutes + ":" + seconds;
 				}
 			}
+
+			var screenshot = document.getElementById("screenshot");
+			screenshot.addEventListener("click", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/screenshot/", true);
+				x.send();
+			});
 		};
 	</script>
 	<body>
@@ -134,6 +145,7 @@ const playerPage string = `
 		<input type="range" id="volume" min="0" max="100" step="1" value="{{.vol}}">
 		<input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
 		<button id="timestamp">Timestamp</button>
+		<button id="screenshot">Screenshot</button>
 		<div id="timestamps"></div>
 	</body>
 </html>
@@ -342,6 +354,13 @@ func setTime(state *cartoon, seek int64) {
 	state.player.SetTime(seek * secToMilli)
 }
 
+func screenshot(state *cartoon) {
+	if state.player == nil {
+		return
+	}
+	state.player.TakeSnapshot(screenshotPath, 0, 0, 0)
+}
+
 func main() {
 	port := flag.String("p", "8100", "port to serve on")
 	directory := flag.String("d", ".", "the directory of static file to host")
@@ -371,6 +390,10 @@ func main() {
 	http.Handle("/stop/", http.StripPrefix("/stop/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			stop(&state, w, req)
+		})))
+	http.Handle("/screenshot/", http.StripPrefix("/screenshot/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			screenshot(&state)
 		})))
 	// If this API endpoint is called "seek" it breaks if you try to seek to 0.
 	// WTF
