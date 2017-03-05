@@ -45,6 +45,8 @@ type videoLine struct {
 type cartoon struct {
 	inst    *vlc.Instance
 	player  *vlc.Player
+	media   *vlc.Media
+	vidLen  int64
 	playing bool
 }
 
@@ -147,6 +149,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 		fmt.Println(err)
 		return
 	}
+	state.media = media
 	// Create the media player
 	if state.player, err = media.NewPlayer(); err != nil {
 		fmt.Println(err)
@@ -155,9 +158,6 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	// Initialize player state
 	state.player.SetVolume(25)
 	//state.player.SetFullscreen(true)
-	// Do not need media anymore since player now owns it
-	media.Release()
-	media = nil
 
 	// Make the page to control the video
 	state.player.Play()
@@ -172,6 +172,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 		}
 	}
 	vidLen, err := state.player.Length()
+	state.vidLen = vidLen
 	vidLen = vidLen / secToMilli
 	state.playing = true
 	t := template.Must(template.New("player.html").ParseFiles("./player.html"))
@@ -198,13 +199,31 @@ func closePlayer(state *cartoon) {
 	}
 	state.player.Release()
 	state.inst.Release()
+	state.media.Release()
 	state.player = nil
 	state.inst = nil
+	state.media = nil
+	state.vidLen = 0
 }
 
 func pausePlay(state *cartoon) {
 	if state.player == nil {
 		return
+	}
+	time, err := state.player.Time()
+	if err != nil {
+		panic(err)
+	}
+	// Replay the video
+	if !state.player.WillPlay() {
+		var e error
+		state.player.Release()
+		state.player, e = state.media.NewPlayer()
+		if e != nil {
+			panic(e)
+		}
+		// re set the volume
+		state.player.Play()
 	}
 	state.player.TogglePause(state.playing)
 	state.playing = !state.playing
@@ -256,7 +275,9 @@ func main() {
 	state := cartoon{
 		inst:    nil,
 		player:  nil,
+		media:   nil,
 		playing: false,
+		vidLen:  0,
 	}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "list", 301)
