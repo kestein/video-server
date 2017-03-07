@@ -184,7 +184,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	//io.WriteString(w, playerPage)
 }
 
-func stop(state *cartoon, w http.ResponseWriter, req *http.Request) {
+func stop(state *cartoon, w *http.ResponseWriter, req *http.Request) {
 	if state.player == nil {
 		return
 	}
@@ -206,27 +206,31 @@ func closePlayer(state *cartoon) {
 	state.vidLen = 0
 }
 
-func pausePlay(state *cartoon) {
+func pausePlay(state *cartoon, w *http.ResponseWriter) {
 	if state.player == nil {
 		return
 	}
-	time, err := state.player.Time()
-	if err != nil {
-		panic(err)
-	}
 	// Replay the video
 	if !state.player.WillPlay() {
-		var e error
-		state.player.Release()
-		state.player, e = state.media.NewPlayer()
-		if e != nil {
-			panic(e)
-		}
-		// re set the volume
-		state.player.Play()
+		replay(state)
+	} else {
+		state.player.TogglePause(state.playing)
+		state.playing = !state.playing
 	}
-	state.player.TogglePause(state.playing)
-	state.playing = !state.playing
+	curTime := vidTime(state)
+	io.WriteString(*w, fmt.Sprintf("%d", curTime/secToMilli))
+}
+
+func replay(state *cartoon) {
+	var e error
+	state.player.Release()
+	state.player, e = state.media.NewPlayer()
+	if e != nil {
+		panic(e)
+	}
+	// re set the volume
+	state.player.Play()
+	state.playing = true
 }
 
 func rewind(state *cartoon) {
@@ -234,16 +238,22 @@ func rewind(state *cartoon) {
 		return
 	}
 	var secsRewound int64 = 10
-	curTime, err := state.player.Time()
-	if err != nil {
-		panic(err)
-	}
+	curTime := vidTime(state)
 	rTime := curTime - (secsRewound * secToMilli)
 	if rTime < 0 {
 		state.player.SetTime(0)
 	} else {
 		state.player.SetTime(rTime)
 	}
+}
+
+/* Returns the time of the video in milliseconds */
+func vidTime(state *cartoon) int64 {
+	curTime, err := state.player.Time()
+	if err != nil {
+		panic(err)
+	}
+	return curTime
 }
 
 func setVolume(state *cartoon, toVol int) {
@@ -253,11 +263,16 @@ func setVolume(state *cartoon, toVol int) {
 	state.player.SetVolume(toVol)
 }
 
-func setTime(state *cartoon, seek int64) {
+func setTime(state *cartoon, seek int64, w *http.ResponseWriter) {
 	if state.player == nil {
 		return
 	}
+	if !state.player.WillPlay() {
+		replay(state)
+	}
 	state.player.SetTime(seek * secToMilli)
+	curTime := vidTime(state)
+	io.WriteString(*w, fmt.Sprintf("%d", curTime/secToMilli))
 }
 
 func screenshot(state *cartoon) {
@@ -289,7 +304,7 @@ func main() {
 		})))
 	http.Handle("/playback/", http.StripPrefix("/playback/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			pausePlay(&state)
+			pausePlay(&state, &w)
 		})))
 	http.Handle("/rewind/", http.StripPrefix("/rewind/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -297,7 +312,7 @@ func main() {
 		})))
 	http.Handle("/stop/", http.StripPrefix("/stop/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			stop(&state, w, req)
+			stop(&state, &w, req)
 		})))
 	http.Handle("/screenshot/", http.StripPrefix("/screenshot/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -312,7 +327,7 @@ func main() {
 				fmt.Println("NaN")
 				return
 			}
-			setTime(&state, seekPos)
+			setTime(&state, seekPos, &w)
 		})))
 	http.Handle("/volume/", http.StripPrefix("/volume/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {

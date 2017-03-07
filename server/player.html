@@ -9,17 +9,21 @@
             x.send();
         }
 		window.onload = function () {
+            var videoEnded = false;
 			var playback = document.getElementById("playback");
 			playback.addEventListener("click", function() {
 				var x = new XMLHttpRequest();
 				x.onreadystatechange = function() {
-					var buttonText = String(playback.innerHTML);
-					if (buttonText == "Pause") {
-						playback.innerHTML = "Play";
-					} else {
-						playback.innerHTML = "Pause";
-					}
-					/* Eventually set the seek value to be what the player's second is */
+                    if (this.readyState == 4 && this.status == 200) {
+                        var buttonText = String(playback.innerHTML);
+                        if (buttonText == "Pause") {
+                            playback.innerHTML = "Play";
+                        } else {
+                            playback.innerHTML = "Pause";
+                        }
+                        /* Set the seek bar to the right spot */
+                        seek.value = x.responseText;
+                    }
 				};
 				x.open("GET", "/playback/", true);
 				x.send();
@@ -52,15 +56,28 @@
 			});
 
 			var seek = document.getElementById("seek");
-			seek.addEventListener("mouseup", function() {
+            seek.addEventListener("mouseup", function() { setTime(seek.value); }); 
+            function setTime(time) {
 				var x = new XMLHttpRequest();
 				x.onreadystatechange = function() {
-
+                    if (this.readyState == 4 && this.status == 200) {
+                        /* Set the seek bar to the right spot */
+                        seek.value = x.responseText;
+                        if (videoEnded) {
+                            videoEnded = false;
+                            playback.innerHTML = "Pause";
+                        }
+                    }
 				};
-				x.open("GET", "/time/" + seek.value, true);
+				x.open("GET", "/time/" + time, true);
 				x.send();
-			});
+                seek.value = time
+            }
 			setInterval(function() {
+                if (seek.value === seek.max) {
+                    playback.innerHTML = "Play";
+                    videoEnded = true;
+                }
 				if (String(playback.innerHTML) === "Pause")  {
 					seek.stepUp(1);
 				}
@@ -77,7 +94,7 @@
 			function formatTime(n) {
 				var minutes = Math.floor(n/60);
 				var seconds = n%60;
-				if (seconds < 9) {
+				if (seconds < 10) {
 					seconds = "0" + seconds;
 				}
 				// hours formatting untested so far
