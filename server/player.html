@@ -86,8 +86,10 @@
 			var timestamp = document.getElementById("timestamp");
 			var stamps = document.getElementById("timestamps");
 			timestamp.addEventListener("click", function() {
-				stamp = document.createElement("div");
-				stamp.innerText = formatTime(seek.value);
+                var curTime = seek.value;
+				stamp = document.createElement("button");
+				stamp.innerText = formatTime(curTime);
+                stamp.addEventListener("click", function() { setTime(curTime); });
 				stamps.appendChild(stamp);
 			});
 
