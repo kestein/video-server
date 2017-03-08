@@ -121,6 +121,16 @@
 				x.open("GET", "/screenshot/", true);
 				x.send();
 			});
+
+            var subs = document.getElementById("subs");
+            subs.addEventListener("click", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/subs/", true);
+				x.send();
+            });
 		};
         window.onbeforeunload = function() {
             stopVideo(false);
@@ -135,6 +145,7 @@
 		<input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
 		<button id="timestamp">Timestamp</button>
 		<button id="screenshot">Screenshot</button>
+		<button id="subs">Toggle Subtitles</button>
 		<div id="timestamps"></div>
 	</body>
 </html>

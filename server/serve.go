@@ -20,6 +20,7 @@ const videoPath string = "/home/kestein/Videos"
 const screenshotPath = "/home/kestein/Pictures/screenshots"
 const referer string = "Referer"
 const secToMilli int64 = 1000
+const uninitializedSubs int = -1000
 const pageStart string = `
 <html>
 	<body>
@@ -43,11 +44,12 @@ type videoLine struct {
 }
 
 type cartoon struct {
-	inst    *vlc.Instance
-	player  *vlc.Player
-	media   *vlc.Media
-	vidLen  int64
-	playing bool
+	inst             *vlc.Instance
+	player           *vlc.Player
+	media            *vlc.Media
+	vidLen           int64
+	playing          bool
+	startingSubTrack int
 }
 
 type videoLineList []videoLine
@@ -204,6 +206,7 @@ func closePlayer(state *cartoon) {
 	state.inst = nil
 	state.media = nil
 	state.vidLen = 0
+	state.startingSubTrack = uninitializedSubs
 }
 
 func pausePlay(state *cartoon, w *http.ResponseWriter) {
@@ -282,17 +285,37 @@ func screenshot(state *cartoon) {
 	state.player.TakeSnapshot(screenshotPath, 0, 0, 0)
 }
 
+func toggleSubs(state *cartoon) {
+	if state.player == nil {
+		return
+	}
+	subTrack, err := state.player.SubTile()
+	if err != nil {
+		/* Video does not have subtitles. Do nothing */
+		return
+	}
+	if subTrack != -1 {
+		if state.startingSubTrack == uninitializedSubs {
+			state.startingSubTrack = subTrack
+		}
+		state.player.SetSubtitle(-1)
+	} else {
+		state.player.SetSubtitle(state.startingSubTrack)
+	}
+}
+
 func main() {
 	port := flag.String("p", "8100", "port to serve on")
 	directory := flag.String("d", ".", "the directory of static file to host")
 	flag.Parse()
 
 	state := cartoon{
-		inst:    nil,
-		player:  nil,
-		media:   nil,
-		playing: false,
-		vidLen:  0,
+		inst:             nil,
+		player:           nil,
+		media:            nil,
+		playing:          false,
+		vidLen:           0,
+		startingSubTrack: uninitializedSubs,
 	}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "list", 301)
@@ -337,6 +360,10 @@ func main() {
 				return
 			}
 			setVolume(&state, int(toVol))
+		})))
+	http.Handle("/subs/", http.StripPrefix("/subs/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			toggleSubs(&state)
 		})))
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
