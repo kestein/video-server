@@ -46,17 +46,20 @@
 			});
 
 			var volume = document.getElementById("volume");
-			volume.addEventListener("mouseup", function() {
+            volume.addEventListener("mouseup", function() { setVolume(volume.value) });
+			volume.addEventListener("touchend", function() { setVolume(volume.value) });
+            function setVolume(vol) {
 				var x = new XMLHttpRequest();
 				x.onreadystatechange = function() {
 
 				};
-				x.open("GET", "/volume/" + volume.value, true);
+				x.open("GET", "/volume/" + vol, true);
 				x.send();
-			});
+			}
 
 			var seek = document.getElementById("seek");
             seek.addEventListener("mouseup", function() { setTime(seek.value); }); 
+            seek.addEventListener("touchend", function() { setTime(seek.value); }); 
             function setTime(time) {
 				var x = new XMLHttpRequest();
 				x.onreadystatechange = function() {
@@ -132,10 +135,15 @@
 				x.send();
             });
 		};
-        window.onbeforeunload = function() {
+        //window.onunload = function() {
+        window.addEventListener("unload", function() {
             stopVideo(false);
             return null;
-        };
+        });
+        /*window.addEventListener("pagehide", function() {
+            stopVideo(false);
+            return null;
+        });*/
 	</script>
 	<body>
 		<button id="playback">Pause</button>
