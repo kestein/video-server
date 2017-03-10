@@ -135,15 +135,10 @@
 				x.send();
             });
 		};
-        //window.onunload = function() {
         window.addEventListener("unload", function() {
             stopVideo(false);
             return null;
         });
-        /*window.addEventListener("pagehide", function() {
-            stopVideo(false);
-            return null;
-        });*/
 	</script>
 	<body>
 		<button id="playback">Pause</button>

@@ -184,7 +184,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	//io.WriteString(w, playerPage)
 }
 
-func stop(state *cartoon, w *http.ResponseWriter, req *http.Request) {
+func stop(state *cartoon) {
 	if state.player == nil {
 		return
 	}
@@ -324,6 +324,11 @@ func main() {
 	http.Handle("/list/", http.StripPrefix("/list/", http.HandlerFunc(list)))
 	http.Handle("/play/", http.StripPrefix("/play/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			/* Sometimes the unload event does not trigger on mobile.
+			   Ensure that the other player has stopped. */
+			if state.playing {
+				stop(&state)
+			}
 			play(&state, w, req)
 		})))
 	http.Handle("/playback/", http.StripPrefix("/playback/",
@@ -336,7 +341,7 @@ func main() {
 		})))
 	http.Handle("/stop/", http.StripPrefix("/stop/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			stop(&state, &w, req)
+			stop(&state)
 		})))
 	http.Handle("/screenshot/", http.StripPrefix("/screenshot/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
