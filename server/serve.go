@@ -19,6 +19,7 @@ import (
 const videoPath string = "/home/kestein/Videos"
 const screenshotPath = "/home/kestein/Pictures/screenshots"
 const referer string = "Referer"
+const initVolume int = 75
 const secToMilli int64 = 1000
 const uninitializedSubs int = -1000
 const pageStart string = `
@@ -135,30 +136,26 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	var err error
 
 	// Obtain the name of the video to view
-	rawVideo := req.RequestURI[6:] // Take out the '/play'
+	rawVideo := req.RequestURI[6:] // Take out the '/play/'
 	video, err := url.QueryUnescape(rawVideo)
 	if err != nil {
-		fmt.Println("WRONG")
-		return
+		panic(err)
 	}
 	// Make VLC instance
 	if state.inst, err = vlc.New([]string{}); err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
 	// Open the video file
 	if media, err = state.inst.OpenMediaFile(fmt.Sprintf("%s/%s", videoPath, video)); err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
 	state.media = media
 	// Create the media player
 	if state.player, err = media.NewPlayer(); err != nil {
-		fmt.Println(err)
-		return
+		panic(err)
 	}
 	// Initialize player state
-	state.player.SetVolume(25)
+	state.player.SetVolume(initVolume)
 	//state.player.SetFullscreen(true)
 
 	// Make the page to control the video
@@ -167,6 +164,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	for {
 		t, err := state.player.Length()
 		if err != nil {
+			state.player.Stop()
 			panic(err)
 		}
 		if t > 0 {
@@ -179,7 +177,7 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	state.playing = true
 	t := template.Must(template.New("player.html").ParseFiles("./player.html"))
 	vals := map[string]int64{
-		"vol":  25,
+		"vol":  int64(initVolume),
 		"secs": vidLen,
 	}
 	t.Execute(w, vals)
@@ -229,6 +227,7 @@ func replay(state *cartoon) {
 	state.player.Release()
 	state.player, e = state.media.NewPlayer()
 	if e != nil {
+		state.player.Stop()
 		panic(e)
 	}
 	// re set the volume
@@ -236,6 +235,7 @@ func replay(state *cartoon) {
 	state.playing = true
 }
 
+/* Rewind the video by 10 seconds */
 func rewind(state *cartoon) {
 	if state.player == nil {
 		return
@@ -254,6 +254,7 @@ func rewind(state *cartoon) {
 func vidTime(state *cartoon) int64 {
 	curTime, err := state.player.Time()
 	if err != nil {
+		state.player.Stop()
 		panic(err)
 	}
 	return curTime
@@ -368,5 +369,5 @@ func main() {
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
-	log.Fatal(http.ListenAndServe("localhost:"+*port, nil))
+	log.Fatal(http.ListenAndServe("192.168.2.3:"+*port, nil))
 }
