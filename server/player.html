@@ -1,4 +1,13 @@
 <html>
+    <head>
+        <style>
+            div { padding-top: 15px; }
+            button {
+                padding-right: 7px;
+                padding-left: 7px;
+            }
+        </style>
+    </head>
 	<script>
         function stopVideo(isAsync) {
             var x = new XMLHttpRequest();
@@ -90,10 +99,12 @@
 			var stamps = document.getElementById("timestamps");
 			timestamp.addEventListener("click", function() {
                 var curTime = seek.value;
-				stamp = document.createElement("button");
+                var stampContainer = document.createElement("div");
+				var stamp = document.createElement("button");
 				stamp.innerText = formatTime(curTime);
                 stamp.addEventListener("click", function() { setTime(curTime); });
-				stamps.appendChild(stamp);
+                stampContainer.appendChild(stamp);
+				stamps.appendChild(stampContainer);
 			});
 
 			function formatTime(n) {
