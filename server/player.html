@@ -6,6 +6,10 @@
                 padding-right: 7px;
                 padding-left: 7px;
             }
+            #stop {
+                position: absolute;
+                right: 100px;
+            }
         </style>
     </head>
 	<script>
@@ -152,14 +156,16 @@
         });
 	</script>
 	<body>
-		<button id="playback">Pause</button>
-		<button id="stop">Stop</button>
-		<button id="rewind">Back 10 seconds</button>
+		<button id="timestamp">Timestamp</button>
 		<input type="range" id="volume" min="0" max="100" step="1" value="{{.vol}}">
 		<input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
-		<button id="timestamp">Timestamp</button>
-		<button id="screenshot">Screenshot</button>
 		<button id="subs">Toggle Subtitles</button>
+		<button id="screenshot">Screenshot</button>
 		<div id="timestamps"></div>
+        <div>
+            <button id="playback">Pause</button>
+            <button id="stop">Stop</button>
+            <button id="rewind">Back 10 seconds</button>
+        </div>
 	</body>
 </html>
