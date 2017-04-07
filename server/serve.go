@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	vlc "github.com/kestein/go-vlc"
+	"github.com/yourok/go-mpv/mpv"
 	"html/template"
 	"io"
 	"log"
@@ -45,12 +45,11 @@ type videoLine struct {
 }
 
 type cartoon struct {
-	inst             *vlc.Instance
-	player           *vlc.Player
-	media            *vlc.Media
-	vidLen           int64
-	playing          bool
-	startingSubTrack int
+	player *mpv.Mpv
+	video  string
+	vidLen int64
+	paused bool
+	subbed bool
 }
 
 type videoLineList []videoLine
@@ -131,8 +130,6 @@ func list(w http.ResponseWriter, req *http.Request) {
 }
 
 func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
-	var media *vlc.Media
-	// var evt *vlc.EventManager
 	var err error
 
 	// Obtain the name of the video to view
@@ -141,168 +138,185 @@ func play(state *cartoon, w http.ResponseWriter, req *http.Request) {
 	if err != nil {
 		panic(err)
 	}
-	// Make VLC instance
-	if state.inst, err = vlc.New([]string{}); err != nil {
-		panic(err)
-	}
-	// Open the video file
-	if media, err = state.inst.OpenMediaFile(fmt.Sprintf("%s/%s", videoPath, video)); err != nil {
-		panic(err)
-	}
-	state.media = media
-	// Create the media player
-	if state.player, err = media.NewPlayer(); err != nil {
-		panic(err)
-	}
-	// Initialize player state
-	state.player.SetVolume(initVolume)
-	//state.player.SetFullscreen(true)
-
-	// Make the page to control the video
-	state.player.Play()
-	// Wait for the player to start playing
-	for {
-		t, err := state.player.Length()
-		if err != nil {
-			state.player.Stop()
-			panic(err)
-		}
-		if t > 0 {
-			break
-		}
-	}
-	vidLen, err := state.player.Length()
-	state.vidLen = vidLen
-	vidLen = vidLen / secToMilli
-	state.playing = true
+	// Start the video
+	startPlay(state, video)
+	state.video = video
 	t := template.Must(template.New("player.html").ParseFiles("./player.html"))
 	vals := map[string]int64{
-		"vol":  int64(initVolume),
-		"secs": vidLen,
+		"vol":  int64(75),
+		"secs": state.vidLen,
 	}
 	t.Execute(w, vals)
 	//io.WriteString(w, playerPage)
+}
+
+func startPlay(state *cartoon, video string) {
+	var player *mpv.Mpv = mpv.Create()
+	go func() {
+		for {
+			e := player.WaitEvent(1)
+			if e.Event_Id == mpv.EVENT_END_FILE {
+				stop(state)
+				closePlayer(state)
+				break
+			}
+		}
+	}()
+	player.SetOptionString("fullscreen", "yes")
+	err := player.Initialize()
+	if err != nil {
+		fmt.Println("failed to initialize ", err)
+		panic("")
+	}
+	err = player.Command([]string{"loadfile", fmt.Sprintf("%s/%s", videoPath, video)})
+	if err != nil {
+		fmt.Println("failed to loadfile ", err)
+		panic("")
+	}
+	state.player = player
+	state.vidLen = vidLen(state)
+	state.paused = false
+	state.subbed = true
 }
 
 func stop(state *cartoon) {
 	if state.player == nil {
 		return
 	}
-	state.player.Stop()
-	state.playing = false
-	closePlayer(state)
+	err := state.player.Command([]string{"stop"})
+	if err != nil {
+		fmt.Println("unable to stop ", err)
+		panic("")
+	}
+	state.paused = true
 }
 
 func closePlayer(state *cartoon) {
 	if state.player == nil {
 		return
 	}
-	state.player.Release()
-	state.inst.Release()
-	state.media.Release()
+	state.player.TerminateDestroy()
 	state.player = nil
-	state.inst = nil
-	state.media = nil
 	state.vidLen = 0
-	state.startingSubTrack = uninitializedSubs
 }
 
 func pausePlay(state *cartoon, w *http.ResponseWriter) {
-	if state.player == nil {
+	var err error
+	if state.player == nil && len(state.video) > 0 {
+		startPlay(state, state.video)
+		io.WriteString(*w, fmt.Sprintf("%d", 0))
 		return
 	}
-	// Replay the video
-	if !state.player.WillPlay() {
-		replay(state)
+	if state.paused {
+		err = state.player.SetOptionString("pause", "no")
 	} else {
-		state.player.TogglePause(state.playing)
-		state.playing = !state.playing
+		err = state.player.SetOptionString("pause", "yes")
 	}
-	curTime := vidTime(state)
-	io.WriteString(*w, fmt.Sprintf("%d", curTime/secToMilli))
-}
-
-func replay(state *cartoon) {
-	var e error
-	state.player.Release()
-	state.player, e = state.media.NewPlayer()
-	if e != nil {
-		state.player.Stop()
-		panic(e)
+	if err != nil {
+		fmt.Println("problem toggling play ", err)
+		panic("")
 	}
-	// re set the volume
-	state.player.Play()
-	state.playing = true
+	state.paused = !state.paused
+	io.WriteString(*w, fmt.Sprintf("%d", vidTime(state)))
 }
 
 /* Rewind the video by 10 seconds */
 func rewind(state *cartoon) {
+	var err error
 	if state.player == nil {
 		return
 	}
 	var secsRewound int64 = 10
 	curTime := vidTime(state)
-	rTime := curTime - (secsRewound * secToMilli)
+	rTime := curTime - secsRewound
 	if rTime < 0 {
-		state.player.SetTime(0)
+		err = state.player.Command([]string{"seek", "0", "absolute"})
 	} else {
-		state.player.SetTime(rTime)
+		err = state.player.Command([]string{"seek", "-10", "relative"})
 	}
-}
-
-/* Returns the time of the video in milliseconds */
-func vidTime(state *cartoon) int64 {
-	curTime, err := state.player.Time()
 	if err != nil {
-		state.player.Stop()
-		panic(err)
+		fmt.Println("unable to seek ", err)
+		panic("")
 	}
-	return curTime
 }
 
+/* Returns the time of the video in seconds */
+func vidTime(state *cartoon) int64 {
+	var vidTime int64
+	for {
+		t, _ := state.player.GetProperty("playback-time", mpv.FORMAT_INT64)
+		if t != nil {
+			vidTime = t.(int64)
+			break
+		}
+	}
+	return vidTime
+}
+
+func vidLen(state *cartoon) int64 {
+	var vidLen int64
+	// Wait for the video to initialize
+	for {
+		len, _ := state.player.GetProperty("duration", mpv.FORMAT_INT64)
+		if len != nil {
+			vidLen = len.(int64)
+			break
+		}
+	}
+	return vidLen
+}
+
+/*
 func setVolume(state *cartoon, toVol int) {
 	if state.player == nil {
 		return
 	}
-	state.player.SetVolume(toVol)
+	//state.player.SetVolume(toVol)
 }
-
+*/
 func setTime(state *cartoon, seek int64, w *http.ResponseWriter) {
 	if state.player == nil {
-		return
+		startPlay(state, state.video)
 	}
-	if !state.player.WillPlay() {
-		replay(state)
+	err := state.player.Command([]string{"seek", strconv.FormatInt(seek, 10), "absolute"})
+	if err != nil {
+		fmt.Println("Unable to set the time ", err)
+		panic("")
 	}
-	state.player.SetTime(seek * secToMilli)
 	curTime := vidTime(state)
-	io.WriteString(*w, fmt.Sprintf("%d", curTime/secToMilli))
+	if w != nil {
+		io.WriteString(*w, fmt.Sprintf("%d", curTime))
+	}
 }
 
 func screenshot(state *cartoon) {
 	if state.player == nil {
 		return
 	}
-	state.player.TakeSnapshot(screenshotPath, 0, 0, 0)
+	videoName := state.player.GetPropertyString("filename/no-ext")
+	fmt.Println(fmt.Sprintf("%s/%s-%d.png", screenshotPath, videoName, vidTime(state)))
+	err := state.player.Command([]string{"screenshot-to-file", fmt.Sprintf("%s/%s-%d.png", screenshotPath, videoName, vidTime(state))})
+	if err != nil {
+		fmt.Println("Unable to take screenshot ", err)
+		panic("")
+	}
 }
 
 func toggleSubs(state *cartoon) {
+	var err error
 	if state.player == nil {
 		return
 	}
-	subTrack, err := state.player.SubTile()
-	if err != nil {
-		/* Video does not have subtitles. Do nothing */
-		return
-	}
-	if subTrack != -1 {
-		if state.startingSubTrack == uninitializedSubs {
-			state.startingSubTrack = subTrack
-		}
-		state.player.SetSubtitle(-1)
+	if state.subbed {
+		err = state.player.SetOptionString("sub-visibility", "no")
 	} else {
-		state.player.SetSubtitle(state.startingSubTrack)
+		err = state.player.SetOptionString("sub-visibility", "yes")
 	}
+	if err != nil {
+		fmt.Println("Unable to toggle subs ", err)
+		panic("")
+	}
+	state.subbed = !state.subbed
 }
 
 func main() {
@@ -311,12 +325,11 @@ func main() {
 	flag.Parse()
 
 	state := cartoon{
-		inst:             nil,
-		player:           nil,
-		media:            nil,
-		playing:          false,
-		vidLen:           0,
-		startingSubTrack: uninitializedSubs,
+		player: nil,
+		video:  "",
+		vidLen: 0,
+		paused: true,
+		subbed: true,
 	}
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "list", 301)
@@ -326,8 +339,14 @@ func main() {
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			/* Sometimes the unload event does not trigger on mobile.
 			   Ensure that the other player has stopped. */
-			if state.playing {
-				stop(&state)
+			if state.player != nil {
+				// Seek to the end of the video and let the goroutine clean up the previous player
+				setTime(&state, state.vidLen, nil)
+				for {
+					if state.player == nil {
+						break
+					}
+				}
 			}
 			play(&state, w, req)
 		})))
@@ -341,7 +360,8 @@ func main() {
 		})))
 	http.Handle("/stop/", http.StripPrefix("/stop/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			stop(&state)
+			// Seek to the end of the video and let the goroutine clean up the previous player
+			setTime(&state, state.vidLen, nil)
 		})))
 	http.Handle("/screenshot/", http.StripPrefix("/screenshot/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -360,12 +380,13 @@ func main() {
 		})))
 	http.Handle("/volume/", http.StripPrefix("/volume/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			toVol, err := strconv.ParseInt(req.URL.String(), 10, 64)
+			/*toVol, err := strconv.ParseInt(req.URL.String(), 10, 64)
 			if err != nil {
 				fmt.Println("NaN")
 				return
 			}
 			setVolume(&state, int(toVol))
+			*/
 		})))
 	http.Handle("/subs/", http.StripPrefix("/subs/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
@@ -374,5 +395,5 @@ func main() {
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
-	log.Fatal(http.ListenAndServe("192.168.2.3:"+*port, nil))
+	log.Fatal(http.ListenAndServe("192.168.2.8:"+*port, nil))
 }
