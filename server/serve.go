@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"github.com/yourok/go-mpv/mpv"
+	"github.com/YouROK/go-mpv/mpv"
 	"html/template"
 	"io"
 	"log"
@@ -162,7 +162,15 @@ func startPlay(state *cartoon, video string) {
 			}
 		}
 	}()
+	// Options ricing
 	player.SetOptionString("fullscreen", "yes")
+	player.SetOptionString("screenshot-format", "png")
+	player.SetOptionString("screenshot-png-compression", "5")
+	player.SetOptionString("screenshot-png-filter", "0")
+	player.SetOptionString("screenshot-tag-colorspace", "yes")
+	player.SetOptionString("screenshot-high-bit-depth", "yes")
+	player.SetOptionString("slang", "eng,en,enUS,en-US")
+	player.SetOptionString("alang", "jpn,jp,eng,en,enUS,en-US")
 	err := player.Initialize()
 	if err != nil {
 		fmt.Println("failed to initialize ", err)
@@ -294,7 +302,6 @@ func screenshot(state *cartoon) {
 		return
 	}
 	videoName := state.player.GetPropertyString("filename/no-ext")
-	fmt.Println(fmt.Sprintf("%s/%s-%d.png", screenshotPath, videoName, vidTime(state)))
 	err := state.player.Command([]string{"screenshot-to-file", fmt.Sprintf("%s/%s-%d.png", screenshotPath, videoName, vidTime(state))})
 	if err != nil {
 		fmt.Println("Unable to take screenshot ", err)
@@ -395,5 +402,5 @@ func main() {
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
-	log.Fatal(http.ListenAndServe("192.168.2.8:"+*port, nil))
+	log.Fatal(http.ListenAndServe("localhost:"+*port, nil))
 }
