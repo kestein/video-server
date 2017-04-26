@@ -3,14 +3,32 @@
         <style>
             div { padding-top: 15px; }
             button {
-                padding-right: 7px;
-                padding-left: 7px;
+                border: none;
+                padding: 15px 32px;
+                text-align: center;
+                text-decoration: none;
+                display: inline-block;
+                font-size: 16px;
+                margin: 4px 2px;
+                cursor: pointer;
             }
             #stop {
                 position: absolute;
                 right: 100px;
             }
+            #sidebar {
+                overflow-y: scroll;
+                position: absolute;
+                left: 0;
+                top: 0;
+                height: 100%;
+                text-align: center;
+            }
+            #main {
+                margin-left: 150px;
+            }
         </style>
+        <meta name="viewport" content="width=device-width, initial-scale=1" /> 
     </head>
 	<script>
         function stopVideo(isAsync) {
@@ -106,7 +124,11 @@
                 var stampContainer = document.createElement("div");
 				var stamp = document.createElement("button");
 				stamp.innerText = formatTime(curTime);
-                stamp.addEventListener("click", function() { setTime(curTime); });
+				stamp.style.margin = "0 auto";
+                stamp.addEventListener("click", function() { 
+                    setTime(curTime);
+                    stamp.style.background = "green";
+                });
                 stampContainer.appendChild(stamp);
 				stamps.appendChild(stampContainer);
 			});
@@ -150,22 +172,24 @@
 				x.send();
             });
 		};
-        window.addEventListener("unload", function() {
-            stopVideo(false);
-            return null;
-        });
 	</script>
 	<body>
-		<button id="timestamp">Timestamp</button>
-		<input type="range" id="volume" min="0" max="100" step="1" value="{{.vol}}">
-		<input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
-		<button id="subs">Toggle Subtitles</button>
-		<button id="screenshot">Screenshot</button>
-		<div id="timestamps"></div>
-        <div>
-            <button id="playback">Pause</button>
-            <button id="stop">Stop</button>
-            <button id="rewind">Back 10 seconds</button>
+        <div id="container">
+            <div id="sidebar">
+                <button id="timestamp">Timestamp</button>
+                <div id="timestamps"></div>
+            </div>
+            <div id="main">
+                <input type="range" id="volume" min="0" max="100" step="1" value="{{.vol}}">
+                <input type="range" id="seek" min="0" max="{{.secs}}" step="1" value="0">
+                <button id="subs">Toggle Subtitles</button>
+                <button id="screenshot">Screenshot</button>
+                <div>
+                    <button id="playback">Pause</button>
+                    <button id="stop">Stop</button>
+                    <button id="rewind">Back 10 seconds</button>
+                </div>
+            </div>
         </div>
 	</body>
 </html>
