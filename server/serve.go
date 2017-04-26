@@ -225,7 +225,9 @@ func pausePlay(state *cartoon, w *http.ResponseWriter) {
 		panic("")
 	}
 	state.paused = !state.paused
-	io.WriteString(*w, fmt.Sprintf("%d", vidTime(state)))
+	if w != nil {
+		io.WriteString(*w, fmt.Sprintf("%d", vidTime(state)))
+	}
 }
 
 /* Rewind the video by 10 seconds */
@@ -367,6 +369,9 @@ func main() {
 		})))
 	http.Handle("/stop/", http.StripPrefix("/stop/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			if state.paused {
+				pausePlay(&state, nil)
+			}
 			// Seek to the end of the video and let the goroutine clean up the previous player
 			setTime(&state, state.vidLen, nil)
 		})))
