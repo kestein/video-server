@@ -236,13 +236,13 @@ func rewind(state *cartoon) {
 	if state.player == nil {
 		return
 	}
-	var secsRewound int64 = 10
+	var secsRewound int64 = 5
 	curTime := vidTime(state)
 	rTime := curTime - secsRewound
 	if rTime < 0 {
 		err = state.player.Command([]string{"seek", "0", "absolute"})
 	} else {
-		err = state.player.Command([]string{"seek", "-10", "relative"})
+		err = state.player.Command([]string{"seek", "-5", "relative"})
 	}
 	if err != nil {
 		fmt.Println("unable to seek ", err)
@@ -407,5 +407,5 @@ func main() {
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 
 	log.Printf("Serving %s on HTTP port: %s\n", *directory, *port)
-	log.Fatal(http.ListenAndServe("localhost:"+*port, nil))
+	log.Fatal(http.ListenAndServe("192.168.2.8:"+*port, nil))
 }

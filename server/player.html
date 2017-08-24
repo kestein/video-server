@@ -74,6 +74,7 @@
 				};
 				x.open("GET", "/rewind/", true);
 				x.send();
+                seek.value -= 5;
 			});
 
 			var volume = document.getElementById("volume");
@@ -187,7 +188,7 @@
                 <div>
                     <button id="playback">Pause</button>
                     <button id="stop">Stop</button>
-                    <button id="rewind">Back 10 seconds</button>
+                    <button id="rewind">Back 5 seconds</button>
                 </div>
             </div>
         </div>
