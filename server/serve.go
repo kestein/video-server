@@ -165,7 +165,9 @@ func startPlay(state *cartoon, video string) {
 	// Options ricing
 	player.SetOptionString("fullscreen", "yes")
 	player.SetOptionString("screenshot-format", "png")
-	player.SetOptionString("screenshot-png-compression", "5")
+	player.SetOptionString("screenshot-directory", screenshotPath)
+	player.SetOptionString("screenshot-template", "%F-%P-%n")
+	player.SetOptionString("screenshot-png-compression", "0")
 	player.SetOptionString("screenshot-png-filter", "0")
 	player.SetOptionString("screenshot-tag-colorspace", "yes")
 	player.SetOptionString("screenshot-high-bit-depth", "yes")
@@ -303,8 +305,7 @@ func screenshot(state *cartoon) {
 	if state.player == nil {
 		return
 	}
-	videoName := state.player.GetPropertyString("filename/no-ext")
-	err := state.player.Command([]string{"screenshot-to-file", fmt.Sprintf("%s/%s-%d.png", screenshotPath, videoName, vidTime(state))})
+	err := state.player.Command([]string{"screenshot"})
 	if err != nil {
 		fmt.Println("Unable to take screenshot ", err)
 		panic("")
