@@ -92,7 +92,7 @@ func list(w http.ResponseWriter, req *http.Request) {
 		// For RESTing
 		vidURL := ""
 		if len(req.URL.String()) > 0 {
-			vidURL = fmt.Sprintf("%s/%s", req.URL.String(), url.QueryEscape(fileName))
+			vidURL = fmt.Sprintf("%s/%s", url.QueryEscape(fullPath[len(videoPath)+1:]), url.QueryEscape(fileName))
 		} else {
 			vidURL = fmt.Sprintf("%s", url.QueryEscape(fileName))
 		}
