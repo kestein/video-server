@@ -352,6 +352,9 @@ func main() {
 			if state.player != nil {
 				// Seek to the end of the video and let the goroutine clean up the previous player
 				setTime(&state, state.vidLen, nil)
+				if state.paused {
+					pausePlay(&state, nil)
+				}
 				for {
 					if state.player == nil {
 						break
