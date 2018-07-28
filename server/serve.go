@@ -278,14 +278,6 @@ func vidLen(state *cartoon) int64 {
 	return vidLen
 }
 
-/*
-func setVolume(state *cartoon, toVol int) {
-	if state.player == nil {
-		return
-	}
-	//state.player.SetVolume(toVol)
-}
-*/
 func setTime(state *cartoon, seek int64, w *http.ResponseWriter) {
 	if state.player == nil {
 		startPlay(state, state.video)
@@ -327,6 +319,26 @@ func toggleSubs(state *cartoon) {
 		panic("")
 	}
 	state.subbed = !state.subbed
+}
+
+func cycleProperty(state *cartoon, property string) {
+	var err error
+	if state.player == nil {
+		return
+	}
+	err = state.player.Command([]string{"cycle", property, "down"})
+	if err != nil {
+		errMsg := fmt.Sprintf("Unable to cycle through property %s", property)
+		fmt.Println(errMsg, err)
+		panic("")
+	}
+	track, err := state.player.GetProperty(property, mpv.FORMAT_STRING)
+	if err == nil {
+		// Skip over the disabled property
+		if track == "no" {
+			cycleProperty(state, property)
+		}
+	}
 }
 
 func main() {
@@ -394,19 +406,17 @@ func main() {
 			}
 			setTime(&state, seekPos, &w)
 		})))
-	http.Handle("/volume/", http.StripPrefix("/volume/",
-		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
-			/*toVol, err := strconv.ParseInt(req.URL.String(), 10, 64)
-			if err != nil {
-				fmt.Println("NaN")
-				return
-			}
-			setVolume(&state, int(toVol))
-			*/
-		})))
-	http.Handle("/subs/", http.StripPrefix("/subs/",
+	http.Handle("/subsoff/", http.StripPrefix("/subsoff/",
 		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			toggleSubs(&state)
+		})))
+	http.Handle("/subsup/", http.StripPrefix("/subsup/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			cycleProperty(&state, "sid")
+		})))
+	http.Handle("/langsup/", http.StripPrefix("/langsup/",
+		http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+			cycleProperty(&state, "aid")
 		})))
 	http.HandleFunc("/favicon.ico", func(w http.ResponseWriter, r *http.Request) {})
 

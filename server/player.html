@@ -169,7 +169,25 @@
 				x.onreadystatechange = function() {
 
 				};
-				x.open("GET", "/subs/", true);
+				x.open("GET", "/subsoff/", true);
+				x.send();
+            });
+            var subswap = document.getElementById("subswap");
+            subswap.addEventListener("click", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/subsup/", true);
+				x.send();
+            });
+            var langwap = document.getElementById("langswap");
+            langwap.addEventListener("click", function() {
+				var x = new XMLHttpRequest();
+				x.onreadystatechange = function() {
+
+				};
+				x.open("GET", "/langsup/", true);
 				x.send();
             });
 		};
@@ -190,6 +208,8 @@
                     <button id="stop">Stop</button>
                     <button id="rewind">Back 5 seconds</button>
                 </div>
+                <button id="langswap">Change Lang</button>
+                <button id="subswap">Change Subs</button>
             </div>
         </div>
 	</body>
